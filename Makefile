@@ -14,7 +14,7 @@ debug: main
 
 main: src/ arch/
 	@rm -f src/arch
-	@ln -s /home/yzzo/Projects/Quasar/arch/$(ARCH)/src src/arch
+	@ln -s ../arch/$(ARCH)/src src/arch
 	@bash arch/$(ARCH)/build.sh
 	@rm main.efi.obj main.pdb
 

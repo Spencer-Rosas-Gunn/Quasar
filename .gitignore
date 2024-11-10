@@ -3,3 +3,4 @@
 *.#
 main.efi
 src/arch
+!arch/*/src

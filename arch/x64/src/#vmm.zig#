@@ -1,0 +1,19 @@
+// PML5: [512]*PML4
+// PML4: [512]*PD
+// PD: [512]PDE
+// PT: [512]PTE
+
+const PageTableEntry_t = packed struct {
+    addr: u51,
+    _rsvd: u13 = 0,
+    present: bool,
+    read_write: bool,
+    user_supervisor: bool,
+    write_through: bool,
+    cache_disabled: bool,
+    accessed: bool,
+    dirty: bool,
+    large_page: bool,
+    global: bool,
+    _rsvd: u8 = 0,
+};

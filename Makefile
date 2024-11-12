@@ -1,3 +1,5 @@
+ARCH ?= x64
+
 help:
 	@echo "Usage:"
 	@echo "    make help - print this message and exit"

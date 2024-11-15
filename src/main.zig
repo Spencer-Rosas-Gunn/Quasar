@@ -1,14 +1,16 @@
+// Import UEFI Interface
 const uefi = @import("std").os.uefi;
-const info = @import("arch/info.zig");
 
 // Link runtime functions
 const memcpy = @import("rt.zig").memcpy;
 const memset = @import("rt.zig").memset;
 
+// Import Modules
 const tables = @import("uefi-tables.zig");
-
+const info = @import("arch/info.zig");
 const io = @import("io.zig");
-const pmm = @import("pmm.zig");
+const page = @import("page.zig");
+const vmm = @import("arch/vmm.zig");
 
 pub fn main() void {
     // Initialize UEFI Tables
@@ -16,12 +18,22 @@ pub fn main() void {
     _ = tables.con_out.reset(false);
     tables.boot_services = uefi.system_table.boot_services.?;
 
-    pmm.init();
-    var page = pmm.new();
-    page.delete();
+    page.init();
 
     var buf: [256]u8 = undefined;
-    io.kprintf(&buf, "Hello World!\n", .{});
+    io.kprintf(&buf, "Initialized\n", .{});
+
+	var toMe: usize = undefined;
+   	
+    var addr_space = vmm.AddressSpace_t.new();
+    vmm.mmap(&toMe, &toMe, addr_space);
+
+	io.kprintf(&buf, "Memory Mapped!\n", .{});
+    
+    vmm.munmap(&toMe, addr_space);
+    addr_space.delete();
+	
+    io.kprintf(&buf, "The program runs!", .{});
 
     while (true) {}
 }

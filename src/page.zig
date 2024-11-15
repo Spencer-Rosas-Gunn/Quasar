@@ -1,6 +1,8 @@
 const uefi = @import("std").os.uefi;
 const tables = @import("uefi-tables.zig");
 const info = @import("arch/info.zig");
+const io = @import("io.zig");
+
 const Self = @This();
 
 page: info.RawPage_t,
@@ -17,7 +19,7 @@ pub fn fromPtr(ptr: anytype) Self {
     return out;
 }
 
-pub fn toPtr(self: *Self, t: type) t {
+pub fn toPtr(self: *const Self, t: type) t {
     return @ptrFromInt(@as(usize, @intCast(self.page)) * info.page_size);
 }
 
@@ -85,12 +87,11 @@ pub fn init() void {
         }
 
         // Add those pages to the freelist
-        const start = mmap[0].physical_start;
+        const start = mmap[0].physical_start / info.page_size;
 
         var j: usize = 0;
         while (j < mmap[0].number_of_pages) : (j += 1) {
-            var out: Self = undefined;
-            out.page = @intCast(start + j);
+            var out: Self = .{ .page = @intCast(start + j) };
             out.delete();
         }
     }

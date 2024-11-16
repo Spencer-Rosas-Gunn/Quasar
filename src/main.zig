@@ -11,6 +11,7 @@ const info = @import("arch/info.zig");
 const io = @import("io.zig");
 const page = @import("page.zig");
 const vmm = @import("arch/vmm.zig");
+const Stack_t = @import("stack.zig").new;
 
 pub fn main() void {
     // Initialize UEFI Tables
@@ -20,19 +21,20 @@ pub fn main() void {
 
     page.init();
 
-    var buf: [256]u8 = undefined;
-    io.kprintf(&buf, "Initialized\n", .{});
-
 	var toMe: usize = undefined;
    	
     var addr_space = vmm.AddressSpace_t.new();
     vmm.mmap(&toMe, &toMe, addr_space);
-
-	io.kprintf(&buf, "Memory Mapped!\n", .{});
     
     vmm.munmap(&toMe, addr_space);
     addr_space.delete();
-	
+
+    var stack: Stack_t(isize) = Stack_t(isize).new();
+   	defer stack.delete();
+    stack.push(0);
+    _ = stack.pop();
+
+	var buf: [256]u8 = undefined;
     io.kprintf(&buf, "The program runs!", .{});
 
     while (true) {}

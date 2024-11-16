@@ -1,5 +1,5 @@
 const info = @import("info.zig");
-const page = @import("../page.zig");
+const Page_t = @import("../page.zig").Page_t;
 
 const io = @import("../io.zig");
 
@@ -20,14 +20,14 @@ const PageTableEntry_t = packed struct {
 
     pub fn index(self: *PageTableEntry_t) *[512]PageTableEntry_t {
         if (self.page_ppn == 0) {
-            self.page_ppn = page.new().page;
+            self.page_ppn = Page_t.new().page;
 
-            for(page.fromInt(self.page_ppn).toPtr(*[512]PageTableEntry_t)) |*entry| {
+            for(Page_t.fromInt(self.page_ppn).toPtr(*[512]PageTableEntry_t)) |*entry| {
             	entry.* = .{ .page_ppn = 0, };
             }
         }
 
-        return page.fromInt(self.page_ppn).toPtr(*[512]PageTableEntry_t);
+        return Page_t.fromInt(self.page_ppn).toPtr(*[512]PageTableEntry_t);
     }
 
     pub fn fromInt(ptr: anytype) PageTableEntry_t {
@@ -49,7 +49,7 @@ pub const AddressSpace_t = struct {
 	data: *anyopaque,
 
 	pub fn new() AddressSpace_t {
-		var mem = page.new();
+		var mem = Page_t.new();
 		
 		const entries = mem.toPtr(*[512]PageTableEntry_t);
 		
@@ -61,7 +61,7 @@ pub const AddressSpace_t = struct {
 	}
 
 	pub fn delete(self: *AddressSpace_t) void {
-		@as(*page, @ptrCast(@alignCast(self.data))).delete();
+		@as(*Page_t, @ptrCast(@alignCast(self.data))).delete();
 	}
 
 	pub fn use(self: *AddressSpace_t) void {
@@ -72,8 +72,6 @@ pub const AddressSpace_t = struct {
 
 // Map physical address "src" to virtual address "dest"
 pub fn mmap(src: *anyopaque, dest: *anyopaque, addr_space: AddressSpace_t) void {
-	var buf: [4096]u8 = undefined;
-
     const page_num = @intFromPtr(src) / info.page_size;
     const ptr: Pointer_t = @bitCast(@intFromPtr(dest));
     const space: *[512]PageTableEntry_t = @ptrCast(@alignCast(addr_space.data));

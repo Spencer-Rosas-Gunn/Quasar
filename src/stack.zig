@@ -3,7 +3,7 @@ const info = @import("arch/info.zig");
 
 pub fn new(t: type) type {
 	if(@sizeOf(t) != @sizeOf(usize)) {
-		@compileError("Item must be 64-bit aligned!");
+		@compileError("Items must be word-sized!");
 	}
 
 	return struct {

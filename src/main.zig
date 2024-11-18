@@ -28,7 +28,7 @@ pub fn main() void {
 	var toMe: usize = undefined;
    	
     var addr_space = vmm.AddressSpace_t.new();
-    vmm.mmap(&toMe, &toMe, addr_space);
+    vmm.mmap(&toMe, &toMe, addr_space, true);
     
     vmm.munmap(&toMe, addr_space);
     addr_space.delete();

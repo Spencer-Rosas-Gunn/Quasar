@@ -5,7 +5,7 @@ const io = @import("../io.zig");
 
 const PageTableEntry_t = packed struct {
     present: bool = true,
-    writeable: bool = true,
+    writeable: bool,
     user_access: bool = true,
     write_through: bool = true,
     cache_disabled: bool = false,
@@ -18,20 +18,20 @@ const PageTableEntry_t = packed struct {
     _rsvd2: u11 = 0,
     execution_disabled: bool = false,
 
+	pub fn fromInt(ptr: anytype, writeable: bool) PageTableEntry_t {
+		return .{ .page_ppn = @intCast(ptr), .writeable = writeable, };
+	}
+
     pub fn index(self: *PageTableEntry_t) *[512]PageTableEntry_t {
         if (self.page_ppn == 0) {
             self.page_ppn = Page_t.new().page;
 
             for(Page_t.fromInt(self.page_ppn).toPtr(*[512]PageTableEntry_t)) |*entry| {
-            	entry.* = .{ .page_ppn = 0, };
+            	entry.* = fromInt(0, true);
             }
         }
 
         return Page_t.fromInt(self.page_ppn).toPtr(*[512]PageTableEntry_t);
-    }
-
-    pub fn fromInt(ptr: anytype) PageTableEntry_t {
-    	return PageTableEntry_t { .page_ppn = @intCast(ptr), };
     }
 };
 
@@ -54,7 +54,7 @@ pub const AddressSpace_t = struct {
 		const entries = mem.toPtr(*[512]PageTableEntry_t);
 		
 		for(entries) |*entry| {
-			entry.* = PageTableEntry_t.fromInt(0);
+			entry.* = PageTableEntry_t.fromInt(0, true);
 		}
 
 		return AddressSpace_t { .data = mem.toPtr(*anyopaque), };
@@ -71,7 +71,7 @@ pub const AddressSpace_t = struct {
 };
 
 // Map physical address "src" to virtual address "dest"
-pub fn mmap(src: *anyopaque, dest: *anyopaque, addr_space: AddressSpace_t) void {
+pub fn mmap(src: *anyopaque, dest: *anyopaque, addr_space: AddressSpace_t, writeable: bool) void {
     const page_num = @intFromPtr(src) / info.page_size;
     const ptr: Pointer_t = @bitCast(@intFromPtr(dest));
     const space: *[512]PageTableEntry_t = @ptrCast(@alignCast(addr_space.data));
@@ -81,7 +81,7 @@ pub fn mmap(src: *anyopaque, dest: *anyopaque, addr_space: AddressSpace_t) void 
     const pdt = pdpt[ptr.pdt].index();
     const pt = &pdt[ptr.pt].index()[0];
 
-    pt.* = PageTableEntry_t.fromInt(page_num);
+    pt.* = PageTableEntry_t.fromInt(page_num, writeable);
 }
 
 // Unmap virtual address "ptr"

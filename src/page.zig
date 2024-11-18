@@ -1,14 +1,30 @@
 const uefi = @import("std").os.uefi;
 const tables = @import("uefi-tables.zig");
 const info = @import("arch/info.zig");
+const atomic = @import("std").builtin.AtomicOrder;
+
+const Node_t = struct {
+	value: usize,
+	next: *Node_t
+};
+
+const alloc = struct {
+	var bump_index: usize = 0;
+	var page_heap: [*]Node_t = undefined;
+	var head: *Node_t = undefined;
+
+	pub fn new() *Node_t {
+		_ = @atomicRmw(usize, &bump_index, .Add, 1, .release);
+		return &page_heap[bump_index];
+	}
+
+	pub fn delete() void {
+		_ = @atomicRmw(usize, &bump_index, .Sub, 1, .acquire);
+	}
+};
 
 pub const Page_t = packed struct {
 	page: info.RawPage_t,
-
-	pub var head: struct {
-		list: Page_t = undefined,
-		index: usize = 0,
-	} = .{};
 
 	pub fn fromInt(int: anytype) Page_t {
 	    var out: Page_t = undefined;
@@ -27,39 +43,24 @@ pub const Page_t = packed struct {
 	}
 
 	pub fn new() Page_t {
-	    if (head.index > 0) {
-	        const out = fromInt(head.list.toPtr([*]usize)[head.index]);
-	        head.index -= 1;
-	        return out;
-	    }
-	
-	    const out = head.list;
-	    head.list = fromInt(head.list.toPtr([*]usize)[head.index]);
-	    head.index = info.page_size / @sizeOf(usize);
-	    return out;
+		_ = @atomicRmw(*Node_t, &alloc.head, .Xchg, alloc.head.next, .acq_rel);
+
+		alloc.delete();
+
+		return Page_t.fromInt(@atomicLoad(usize, &alloc.head.value, .unordered));
 	}
 
 	pub fn delete(self: *Page_t) void {
-	    if (head.index < info.page_size / @sizeOf(usize)) {
-	        head.index += 1;
-	        head.list.toPtr([*]usize)[head.index] = @intCast(self.page);
-	        return;
-	    }
+		var node = alloc.new();
+		node.value = self.page;
 
- 	   const last = head.list;
- 	   head.list = fromInt(self.page);
- 	   head.index = 0;
- 	   head.list.toPtr(*usize).* = @intCast(last.page);
+		node.next = @atomicRmw(*Node_t, &alloc.head, .Xchg, node, .acq_rel);
+
+		alloc.delete();
 	}
 };
 
 pub fn init() void {
-	const static = struct {
-        var buf: [info.page_size / @sizeOf(usize)]usize = undefined;
-    };
-    
-    Page_t.head.list.page = @intCast(@intFromPtr(&static.buf));
-	
 	var mmap: [*]uefi.tables.MemoryDescriptor = undefined;
     var mmap_size: usize = 0;
     var mmap_key: usize = undefined;
@@ -70,7 +71,25 @@ pub fn init() void {
         _ = tables.boot_services.allocatePool(uefi.tables.MemoryType.BootServicesData, mmap_size, @ptrCast(&mmap));
   	}
 
-	var i: usize = 0;
+  	var total_mem: usize = 0;
+
+  	var i: usize = 0;
+  	while(i < mmap_size / desc_size) : (i += 1) {
+  		mmap = @alignCast(@ptrCast(&@as([*]u8, @alignCast(@ptrCast(mmap)))[desc_size]));
+
+  		total_mem += mmap[0].number_of_pages;
+  	}
+
+  	// Initialize alloc.page_heap & alloc.head
+  	const mem = uefi.pool_allocator.alloc(Node_t, total_mem) catch unreachable;
+  	alloc.page_heap = @ptrCast(&mem[0]);
+  	alloc.head = &alloc.page_heap[0];
+  	alloc.bump_index = 1;
+
+	// Reread the memory map, since allocating memory messes with it
+  	_ = tables.boot_services.getMemoryMap(&mmap_size, mmap, &mmap_key, &desc_size, &desc_version);
+
+	i = 0;
 	while (i < mmap_size / desc_size) : (i += 1) {
 	    // *(char**)&mmap += desc_size
 	    mmap = @alignCast(@ptrCast(&@as([*]u8, @alignCast(@ptrCast(mmap)))[desc_size]));

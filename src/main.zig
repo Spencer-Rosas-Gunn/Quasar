@@ -13,27 +13,27 @@ const page = @import("page.zig");
 const vmm = @import("arch/vmm.zig");
 
 pub fn main() void {
-    // Initialize UEFI Tables
-    tables.con_out = uefi.system_table.con_out.?;
-    _ = tables.con_out.reset(false);
-    tables.boot_services = uefi.system_table.boot_services.?;
+	// Initialize UEFI Tables
+	tables.con_out = uefi.system_table.con_out.?;
+	_ = tables.con_out.reset(false);
+	tables.boot_services = uefi.system_table.boot_services.?;
 
 	var buf: [256]u8 = undefined;
 	io.kprintf(&buf, "The program starts!\n", .{});
 
-    page.init();
+	page.init();
 
 	io.kprintf(&buf, "The page system initializes!\n", .{});
 
 	var toMe: usize = undefined;
-   	
-    var addr_space = vmm.AddressSpace_t.new();
-    vmm.mmap(&toMe, &toMe, addr_space, true);
-    
-    vmm.munmap(&toMe, addr_space);
-    addr_space.delete();
+	
+	var addr_space = vmm.AddressSpace_t.new();
+	vmm.mmap(&toMe, &toMe, addr_space, true);
+	
+	vmm.munmap(&toMe, addr_space);
+	addr_space.delete();
 
-    io.kprintf(&buf, "The program runs!", .{});
+	io.kprintf(&buf, "The program runs!", .{});
 
-    while (true) {}
+	while (true) {}
 }

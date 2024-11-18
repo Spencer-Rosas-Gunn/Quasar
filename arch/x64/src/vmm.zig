@@ -48,7 +48,7 @@ const Pointer_t = packed struct {
 pub const AddressSpace_t = struct {
 	data: *anyopaque,
 
-	pub fn new() AddressSpace_t {
+	pub fn new() AddressSpace_t {		
 		var mem = Page_t.new();
 		
 		const entries = mem.toPtr(*[512]PageTableEntry_t);

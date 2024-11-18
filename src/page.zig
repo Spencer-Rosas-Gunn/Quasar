@@ -2,6 +2,7 @@ const uefi = @import("std").os.uefi;
 const tables = @import("uefi-tables.zig");
 const info = @import("arch/info.zig");
 const atomic = @import("std").builtin.AtomicOrder;
+const io = @import("io.zig");
 
 const Node_t = struct {
 	value: usize,
@@ -43,20 +44,18 @@ pub const Page_t = packed struct {
 	}
 
 	pub fn new() Page_t {
-		_ = @atomicRmw(*Node_t, &alloc.head, .Xchg, alloc.head.next, .acq_rel);
+		const out = @atomicRmw(*Node_t, &alloc.head, .Xchg, alloc.head.next, .acq_rel).value;
 
-		alloc.delete();
+		defer alloc.delete();
 
-		return Page_t.fromInt(@atomicLoad(usize, &alloc.head.value, .unordered));
+		return Page_t.fromInt(out);
 	}
 
-	pub fn delete(self: *Page_t) void {
+	pub fn delete(self: *Page_t) void {	
 		var node = alloc.new();
 		node.value = self.page;
 
 		node.next = @atomicRmw(*Node_t, &alloc.head, .Xchg, node, .acq_rel);
-
-		alloc.delete();
 	}
 };
 
@@ -77,6 +76,16 @@ pub fn init() void {
 	while(i < mmap_size / desc_size) : (i += 1) {
 		mmap = @alignCast(@ptrCast(&@as([*]u8, @alignCast(@ptrCast(mmap)))[desc_size]));
 
+		// Double check that memory isn't MMIO, write-protected, read-protected, execute-protected, readonly, or shared with other devices
+		if (mmap[0].attribute.uce or mmap[0].attribute.wp or mmap[0].attribute.rp or mmap[0].attribute.xp or mmap[0].attribute.ro or mmap[0].attribute.sp) {
+			continue;
+		}
+		
+		// Ensure memory is intended for runtime use
+		if (!mmap[0].attribute.memory_runtime) {
+			continue;
+		}
+
 		total_mem += mmap[0].number_of_pages;
 	}
 
@@ -84,10 +93,12 @@ pub fn init() void {
 	const mem = uefi.pool_allocator.alloc(Node_t, total_mem) catch unreachable;
 	alloc.page_heap = @ptrCast(&mem[0]);
 	alloc.head = &alloc.page_heap[0];
-	alloc.bump_index = 1;
+	alloc.bump_index = 0;
 
 	// Reread the memory map, since allocating memory messes with it
-	_ = tables.boot_services.getMemoryMap(&mmap_size, mmap, &mmap_key, &desc_size, &desc_version);
+	while (uefi.Status.BufferTooSmall == tables.boot_services.getMemoryMap(&mmap_size, mmap, &mmap_key, &desc_size, &desc_version)) {
+		_ = tables.boot_services.allocatePool(uefi.tables.MemoryType.BootServicesData, mmap_size, @ptrCast(&mmap));
+	}
 
 	i = 0;
 	while (i < mmap_size / desc_size) : (i += 1) {

@@ -11,6 +11,7 @@ const info = @import("arch/info.zig");
 const io = @import("io.zig");
 const page = @import("page.zig");
 const vmm = @import("arch/vmm.zig");
+const share = @import("share.zig");
 
 pub fn main() void {
 	tables.con_out = uefi.system_table.con_out.?;
@@ -25,6 +26,9 @@ pub fn main() void {
 	vmm.mmap(&toMe, &toMe, addr_space, true);	
 	vmm.munmap(&toMe, addr_space);	
 	addr_space.delete();
+
+	var pool = share.SharedPool_t.new(12);
+	pool.reduce();
 
 	var buf: [256]u8 = undefined;
 	io.kprintf(&buf, "The program runs!", .{});

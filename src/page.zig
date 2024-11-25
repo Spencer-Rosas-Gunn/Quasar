@@ -24,8 +24,8 @@ const alloc = struct {
 	}
 };
 
-pub const Page_t = packed struct {
-	page: info.RawPage_t,
+pub const Page_t = extern struct {
+	page: usize,
 
 	pub fn fromInt(int: anytype) Page_t {
 		var out: Page_t = undefined;
@@ -62,11 +62,10 @@ pub const Page_t = packed struct {
 pub fn init() void {
 	var mmap: [*]uefi.tables.MemoryDescriptor = undefined;
 	var mmap_size: usize = 0;
-	var mmap_key: usize = undefined;
 	var desc_size: usize = undefined;
 	var desc_version: u32 = undefined;
 
-	while (uefi.Status.BufferTooSmall == tables.boot_services.getMemoryMap(&mmap_size, mmap, &mmap_key, &desc_size, &desc_version)) {
+	while (uefi.Status.BufferTooSmall == tables.boot_services.getMemoryMap(&mmap_size, mmap, &tables.mmap_key, &desc_size, &desc_version)) {
 		_ = tables.boot_services.allocatePool(uefi.tables.MemoryType.BootServicesData, mmap_size, @ptrCast(&mmap));
 	}
 
@@ -96,7 +95,7 @@ pub fn init() void {
 	alloc.bump_index = 0;
 
 	// Reread the memory map, since allocating memory messes with it
-	while (uefi.Status.BufferTooSmall == tables.boot_services.getMemoryMap(&mmap_size, mmap, &mmap_key, &desc_size, &desc_version)) {
+	while (uefi.Status.BufferTooSmall == tables.boot_services.getMemoryMap(&mmap_size, mmap, &tables.mmap_key, &desc_size, &desc_version)) {
 		_ = tables.boot_services.allocatePool(uefi.tables.MemoryType.BootServicesData, mmap_size, @ptrCast(&mmap));
 	}
 

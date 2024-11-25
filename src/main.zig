@@ -12,6 +12,7 @@ const io = @import("io.zig");
 const page = @import("page.zig");
 const vmm = @import("arch/vmm.zig");
 const share = @import("share.zig");
+const task = @import("task.zig");
 
 pub fn main() void {
 	tables.con_out = uefi.system_table.con_out.?;
@@ -30,8 +31,13 @@ pub fn main() void {
 	var pool = share.SharedPool_t.new(12);
 	pool.reduce();
 
+	const queue = task.TaskQueue_t.new();
+	_ = queue;
+
 	var buf: [256]u8 = undefined;
 	io.kprintf(&buf, "The program runs!", .{});
+
+	while(uefi.Status.Success != tables.boot_services.exitBootServices(uefi.handle, tables.mmap_key)) {}
 
 	while (true) {}
 }

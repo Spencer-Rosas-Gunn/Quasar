@@ -1,4 +1,4 @@
-ARCH ?= x64
+ARCH ?= x86_64
 
 help:
 	@echo "Usage:"

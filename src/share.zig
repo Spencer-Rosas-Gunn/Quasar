@@ -1,7 +1,7 @@
 const pmm = @import("page.zig");
 const info = @import("arch/info.zig");
 
-pub const SharedPool_t = struct {
+pub const SharedPool_t = extern struct {
 	page: pmm.Page_t,
 
 	pub fn new(size: usize) SharedPool_t {

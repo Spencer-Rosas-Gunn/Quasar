@@ -78,6 +78,11 @@ pub const AddressSpace_t = struct {
 				
 					var pt = Page_t.fromInt(pt_entry.page_ppn);
 
+					for(pt.toPtr(*[512]PageTableEntry_t)) |*entry| {
+						var pg = Page_t.fromInt(entry.page_ppn);
+						pg.delete();
+					}
+
 					pt.delete();
 				}
 

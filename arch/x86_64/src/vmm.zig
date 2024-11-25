@@ -1,5 +1,6 @@
 const info = @import("info.zig");
 const Page_t = @import("../page.zig").Page_t;
+const PageRef_t = @import("../page.zig").PageRef_t;
 const io = @import("../io.zig");
 
 const PageTableEntry_t = packed struct {
@@ -79,8 +80,7 @@ pub const AddressSpace_t = struct {
 					var pt = Page_t.fromInt(pt_entry.page_ppn);
 
 					for(pt.toPtr(*[512]PageTableEntry_t)) |*entry| {
-						var pg = Page_t.fromInt(entry.page_ppn);
-						pg.delete();
+						PageRef_t.new(entry.page_ppn).reduce();
 					}
 
 					pt.delete();

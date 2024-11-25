@@ -24,8 +24,9 @@ const alloc = struct {
 	}
 };
 
-pub const Page_t = extern struct {
+pub const Page_t = struct {
 	page: usize,
+	count: usize = 1,
 
 	pub fn fromInt(int: anytype) Page_t {
 		var out: Page_t = undefined;
@@ -45,17 +46,46 @@ pub const Page_t = extern struct {
 
 	pub fn new() Page_t {
 		const out = @atomicRmw(*Node_t, &alloc.head, .Xchg, alloc.head.next, .acq_rel).value;
-
 		defer alloc.delete();
-
 		return Page_t.fromInt(out);
 	}
 
-	pub fn delete(self: *Page_t) void {	
+	pub fn retain(self: *Page_t) void {
+		_ = @atomicRmw(usize, &self.count, .Add, 1, .acq_rel);
+	}
+
+	pub fn reduce(self: *Page_t) void {
+		if(1 == @atomicRmw(usize, &self.count, .Sub, 1, .acq_rel)) {
+			self.delete();
+		}
+	}
+
+	pub fn delete(self: *const Page_t) void {	
 		var node = alloc.new();
 		node.value = self.page;
 
 		node.next = @atomicRmw(*Node_t, &alloc.head, .Xchg, node, .acq_rel);
+	}
+};
+
+pub const PageRef_t = struct {
+	idx: usize,
+
+	pub var prt: []Page_t = undefined;
+
+	pub fn new(loc: usize) PageRef_t {
+		const page = Page_t.fromInt(loc);
+		defer page.delete();
+		prt[page.page] = page;
+		return .{ .idx = page.page, };
+	}
+
+	pub fn retain(self: *const PageRef_t) void {
+		prt[self.idx].retain();
+	}
+
+	pub fn reduce(self: *const PageRef_t) void {
+		prt[self.idx].reduce();
 	}
 };
 
@@ -72,6 +102,7 @@ pub fn init() void {
 	var total_mem: usize = 0;
 
 	var i: usize = 0;
+	var max: usize = 0;
 	while(i < mmap_size / desc_size) : (i += 1) {
 		mmap = @alignCast(@ptrCast(&@as([*]u8, @alignCast(@ptrCast(mmap)))[desc_size]));
 
@@ -86,6 +117,7 @@ pub fn init() void {
 		}
 
 		total_mem += mmap[0].number_of_pages;
+		max = mmap[0].physical_start / info.page_size + mmap[0].number_of_pages;
 	}
 
 	// Initialize alloc.page_heap & alloc.head
@@ -93,6 +125,9 @@ pub fn init() void {
 	alloc.page_heap = @ptrCast(&mem[0]);
 	alloc.head = &alloc.page_heap[0];
 	alloc.bump_index = 0;
+
+	// Initialize page reference table (prt)
+	PageRef_t.prt = uefi.pool_allocator.alloc(Page_t, max) catch unreachable;
 
 	// Reread the memory map, since allocating memory messes with it
 	while (uefi.Status.BufferTooSmall == tables.boot_services.getMemoryMap(&mmap_size, mmap, &tables.mmap_key, &desc_size, &desc_version)) {

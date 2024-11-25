@@ -1,14 +1,13 @@
 const vmm = @import("arch/vmm.zig");
 const info = @import("arch/info.zig");
 const page = @import("page.zig");
-const shared = @import("share.zig");
 
 pub const Perms_t = enum(u8) {
 	userspace = 0,
 	driverspace = 1,	
 };
 
-export fn noop_msg(_: usize, _: shared.SharedPool_t) *anyopaque {
+export fn noop_msg(_: usize, _: *anyopaque) *anyopaque {
 	return undefined;
 }
 
@@ -16,7 +15,7 @@ export fn noop_err(_: usize, _: *anyopaque) void {}
 
 pub const Task_t = struct {
 	// Handle message passes for IPC
-	msg_callback: *const fn(usize, shared.SharedPool_t) *anyopaque,
+	msg_callback: *const fn(usize, *anyopaque) *anyopaque,
 	// Handle errors (e.g. page faults) raised by the kernel
 	err_callback: *const fn(usize, *anyopaque) void,
 	// Store the address space of the process

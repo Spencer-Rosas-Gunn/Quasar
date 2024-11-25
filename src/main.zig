@@ -11,7 +11,6 @@ const info = @import("arch/info.zig");
 const io = @import("io.zig");
 const page = @import("page.zig");
 const vmm = @import("arch/vmm.zig");
-const share = @import("share.zig");
 const task = @import("task.zig");
 
 pub fn main() void {
@@ -27,9 +26,6 @@ pub fn main() void {
 	vmm.mmap(&toMe, &toMe, addr_space, true);	
 	vmm.munmap(&toMe, addr_space);	
 	addr_space.delete();
-
-	var pool = share.SharedPool_t.new(12);
-	pool.reduce();
 
 	const queue = task.TaskQueue_t.new();
 	_ = queue;

@@ -1,5 +1,6 @@
 // Import UEFI Interface
 const uefi = @import("std").os.uefi;
+const thread = @import("std").Thread;
 
 // Link runtime functions
 const memcpy = @import("rt.zig").memcpy;
@@ -31,7 +32,7 @@ pub fn main() void {
 	_ = queue;
 
 	var buf: [256]u8 = undefined;
-	io.kprintf(&buf, "The program runs!", .{});
+	io.kprintf(&buf, "Hello World!", .{});
 
 	while(uefi.Status.Success != tables.boot_services.exitBootServices(uefi.handle, tables.mmap_key)) {}
 
